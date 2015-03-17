@@ -5,9 +5,11 @@ from nltk.metrics import BigramAssocMeasures
 from nltk.probability import FreqDist, ConditionalFreqDist
 
 
-POLARITY_DATA_DIR = os.path.join('polarityData', 'rt-polaritydata')
-RT_POLARITY_POS_FILE = os.path.join(POLARITY_DATA_DIR, 'rt-polarity-pos.txt')
-RT_POLARITY_NEG_FILE = os.path.join(POLARITY_DATA_DIR, 'rt-polarity-neg.txt')
+POLARITY_DATA_DIR = os.path.join('polarityData', 'rt-polaritydata', 'review_polarity','txt_sentoken')
+POS_DIRECTORY = os.path.join(POLARITY_DATA_DIR,'pos')
+NEG_DIRECTORY = os.path.join(POLARITY_DATA_DIR,'neg')
+#RT_POLARITY_POS_FILE = os.path.join(POLARITY_DATA_DIR, 'rt-polarity-pos.txt')
+#RT_POLARITY_NEG_FILE = os.path.join(POLARITY_DATA_DIR, 'rt-polarity-neg.txt')
 
 
 #this function takes a feature selection mechanism and returns its performance in a variety of metrics
@@ -16,28 +18,42 @@ def evaluate_features(feature_select):
 	negFeatures = []
 	#http://stackoverflow.com/questions/367155/splitting-a-string-into-words-and-punctuation
 	#breaks up the sentences into lists of individual words (as selected by the input mechanism) and appends 'pos' or 'neg' after each list
-	with open(RT_POLARITY_POS_FILE, 'r') as posSentences:
-		for i in posSentences:
-			posWords = re.findall(r"[\w']+|[.,!?;]", i.rstrip())
-			posWords = [feature_select(posWords), 'pos']
-			posFeatures.append(posWords)
-	with open(RT_POLARITY_NEG_FILE, 'r') as negSentences:
-		for i in negSentences:
-			negWords = re.findall(r"[\w']+|[.,!?;]", i.rstrip())
-			negWords = [feature_select(negWords), 'neg']
-			negFeatures.append(negWords)
+	for pos_file in os.listdir(POS_DIRECTORY):
+		fileName = os.path.join(POS_DIRECTORY,pos_file)	
+		with open(fileName, 'r') as posSentences:
+			for i in posSentences:
+				posWords = re.findall(r"[\w']+|[.,!?;]", i.rstrip())
+				posWords = [feature_select(posWords), 'pos']
+				posFeatures.append(posWords)
+	for neg_file in os.listdir(NEG_DIRECTORY):
+		fileNameNeg = os.path.join(NEG_DIRECTORY,neg_file)	
+		with open(fileNameNeg, 'r') as negSentences:
+			for i in negSentences:
+				negWords = re.findall(r"[\w']+|[.,!?;]", i.rstrip())
+				negWords = [feature_select(negWords), 'neg']
+				negFeatures.append(negWords)
 
-	
 	#selects 3/4 of the features to be used for training and 1/4 to be used for testing
 	posCutoff = int(math.floor(len(posFeatures)*3/4))
 	negCutoff = int(math.floor(len(negFeatures)*3/4))
 	trainFeatures = posFeatures[:posCutoff] + negFeatures[:negCutoff]
 	testFeatures = posFeatures[posCutoff:] + negFeatures[negCutoff:]
+	testString = "@RedMartcom Redmart you rock!!!"
+	tweetWords = re.findall(r"[\w']+|[.,!?;]", i.rstrip())
+	tweetWords = [feature_select(tweetWords),'']
+	tweetsWordFeatures = []
+	tweetsWordFeatures.append(tweetWords)
+
+	#selects 3/4 of the features to be used for training and 1/4 to be used for testing
+	posCutoff = int(math.floor(len(posFeatures)*3/4))
+	negCutoff = int(math.floor(len(negFeatures)*3/4))
+	trainFeatures = posFeatures[:posCutoff] + negFeatures[:negCutoff]
+	testFeatures = tweetsWordFeatures
 
 	#trains a Naive Bayes Classifier
 	classifier = NaiveBayesClassifier.train(trainFeatures)	
 
-	#initiates referenceSets and testSets
+	#initiates referenceSets and test
 	referenceSets = collections.defaultdict(set)
 	testSets = collections.defaultdict(set)	
 
@@ -45,17 +61,8 @@ def evaluate_features(feature_select):
 	for i, (features, label) in enumerate(testFeatures):
 		referenceSets[label].add(i)
 		predicted = classifier.classify(features)
+		print predicted
 		testSets[predicted].add(i)	
-
-	#prints metrics to show how well the feature selection did
-	print 'train on %d instances, test on %d instances' % (len(trainFeatures), len(testFeatures))
-	print 'accuracy:', nltk.classify.util.accuracy(classifier, testFeatures)
-	print 'pos precision:', nltk.metrics.precision(referenceSets['pos'], testSets['pos'])
-	print 'pos recall:', nltk.metrics.recall(referenceSets['pos'], testSets['pos'])
-	print 'neg precision:', nltk.metrics.precision(referenceSets['neg'], testSets['neg'])
-	print 'neg recall:', nltk.metrics.recall(referenceSets['neg'], testSets['neg'])
-	classifier.show_most_informative_features(10)
-
 #creates a feature selection mechanism that uses all words
 def make_full_dict(words):
 	return dict([(word, True) for word in words])
@@ -63,20 +70,23 @@ def make_full_dict(words):
 #tries using all words as the feature selection mechanism
 print 'using all words as features'
 evaluate_features(make_full_dict)
-
 #scores words based on chi-squared test to show information gain (http://streamhacker.com/2010/06/16/text-classification-sentiment-analysis-eliminate-low-information-features/)
 def create_word_scores():
 	#creates lists of all positive and negative words
 	posWords = []
 	negWords = []
-	with open(RT_POLARITY_POS_FILE, 'r') as posSentences:
-		for i in posSentences:
-			posWord = re.findall(r"[\w']+|[.,!?;]", i.rstrip())
-			posWords.append(posWord)
-	with open(RT_POLARITY_NEG_FILE, 'r') as negSentences:
-		for i in negSentences:
-			negWord = re.findall(r"[\w']+|[.,!?;]", i.rstrip())
-			negWords.append(negWord)
+	for pos_file in os.listdir(POS_DIRECTORY):
+		fileName = os.path.join(POS_DIRECTORY,pos_file)	
+		with open(fileName, 'r') as posSentences:
+			for i in posSentences:
+				posWord = re.findall(r"[\w']+|[.,!?;]", i.rstrip())
+				posWords.append(posWord)
+	for neg_file in os.listdir(NEG_DIRECTORY):
+		fileNameNeg = os.path.join(NEG_DIRECTORY,neg_file)	
+		with open(fileNameNeg, 'r') as negSentences:
+			for i in negSentences:
+				negWord = re.findall(r"[\w']+|[.,!?;]", i.rstrip())
+				negWords.append(negWord)
 	posWords = list(itertools.chain(*posWords))
 	negWords = list(itertools.chain(*negWords))
 
@@ -124,3 +134,5 @@ for num in numbers_to_test:
 	print 'evaluating best %d word features' % (num)
 	best_words = find_best_words(word_scores, num)
 	evaluate_features(best_word_features)
+
+
