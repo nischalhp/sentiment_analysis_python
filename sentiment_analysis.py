@@ -67,13 +67,6 @@ def evaluate_features(feature_select):
 	global classifier
 	classifier = NaiveBayesClassifier.train(trainFeatures)	
 
-#creates a feature selection mechanism that uses all word
-def make_full_dict(words):
-	return dict([(word, True) for word in words])
-
-#tries using all words as the feature selection mechanism
-print 'using all words as features'
-evaluate_features(make_full_dict)
 #scores words based on chi-squared test to show information gain (http://streamhacker.com/2010/06/16/text-classification-sentiment-analysis-eliminate-low-information-features/)
 def create_word_scores():
 	#creates lists of all positive and negative words
@@ -148,7 +141,7 @@ def best_word_features(words):
 	return dict([(word, True) for word in words if word in best_words])
 
 #numbers of features to select
-numbers_to_test = [10, 100, 1000, 10000, 15000]
+numbers_to_test = [1000]
 #tries the best_word_features mechanism with each of the numbers_to_test of features
 for num in numbers_to_test:
 	print 'evaluating best %d word features' % (num)
@@ -158,7 +151,7 @@ for num in numbers_to_test:
 
 def get_sentiment(tweet):
 	tweetWords = re.findall(r"[\w']+|[.,!?;]", tweet.rstrip())
-	tweetWords = [feature_select(tweetWords),'']
+	tweetWords = [best_word_features(tweetWords),'']
 	tweetsWordFeatures = []
 	tweetsWordFeatures.append(tweetWords)
 	testFeatures = tweetsWordFeatures
@@ -167,3 +160,5 @@ def get_sentiment(tweet):
 		predicted = classifier.classify(features)
 		return predicted
 
+
+#predicted = get_sentiment("@RedMartcom was supposed to deliver between 7 to 9pm..but they just arrived. first time they are failing. bad.")
