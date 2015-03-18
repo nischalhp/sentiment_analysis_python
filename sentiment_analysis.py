@@ -4,13 +4,13 @@ from nltk.classify import NaiveBayesClassifier
 from nltk.metrics import BigramAssocMeasures
 from nltk.probability import FreqDist, ConditionalFreqDist
 
-
+ROOT_POLARITY_DATA_DIR = os.path.join('polarityData','rt-polaritydata')
 POLARITY_DATA_DIR = os.path.join('polarityData', 'rt-polaritydata', 'review_polarity','txt_sentoken')
 POS_DIRECTORY = os.path.join(POLARITY_DATA_DIR,'pos')
 NEG_DIRECTORY = os.path.join(POLARITY_DATA_DIR,'neg')
-#RT_POLARITY_POS_FILE = os.path.join(POLARITY_DATA_DIR, 'rt-polarity-pos.txt')
-#RT_POLARITY_NEG_FILE = os.path.join(POLARITY_DATA_DIR, 'rt-polarity-neg.txt')
-
+RT_POLARITY_POS_FILE = os.path.join(ROOT_POLARITY_DATA_DIR, 'rt-polarity-pos.txt')
+RT_POLARITY_NEG_FILE = os.path.join(ROOT_POLARITY_DATA_DIR, 'rt-polarity-neg.txt')
+USER_DEFINED_NEG_FILE = os.path.join(ROOT_POLARITY_DATA_DIR,'user_defined_neg.txt')
 
 #this function takes a feature selection mechanism and returns its performance in a variety of metrics
 def evaluate_features(feature_select):
@@ -18,6 +18,7 @@ def evaluate_features(feature_select):
 	negFeatures = []
 	#http://stackoverflow.com/questions/367155/splitting-a-string-into-words-and-punctuation
 	#breaks up the sentences into lists of individual words (as selected by the input mechanism) and appends 'pos' or 'neg' after each list
+
 	for pos_file in os.listdir(POS_DIRECTORY):
 		fileName = os.path.join(POS_DIRECTORY,pos_file)	
 		with open(fileName, 'r') as posSentences:
@@ -33,37 +34,40 @@ def evaluate_features(feature_select):
 				negWords = [feature_select(negWords), 'neg']
 				negFeatures.append(negWords)
 
+	with open(RT_POLARITY_NEG_FILE, 'r') as negSentences:
+		for i in negSentences:
+			negWords = re.findall(r"[\w']+|[.,!?;]", i.rstrip())
+			negWords = [feature_select(negWords), 'neg']
+			negFeatures.append(negWords)
+
+	with open(USER_DEFINED_NEG_FILE, 'r') as negSentences:
+		for i in negSentences:
+			negWords = re.findall(r"[\w']+|[.,!?;]", i.rstrip())
+			negWords = [feature_select(negWords), 'neg']
+			negFeatures.append(negWords)
+
+	with open(RT_POLARITY_POS_FILE, 'r') as posSentences:
+		for i in posSentences:
+			posWords= re.findall(r"[\w']+|[.,!?;]", i.rstrip())
+			posWords= [feature_select(posWords), 'pos']
+			posFeatures.append(posWords)
+
 	#selects 3/4 of the features to be used for training and 1/4 to be used for testing
 	posCutoff = int(math.floor(len(posFeatures)*3/4))
 	negCutoff = int(math.floor(len(negFeatures)*3/4))
 	trainFeatures = posFeatures[:posCutoff] + negFeatures[:negCutoff]
 	testFeatures = posFeatures[posCutoff:] + negFeatures[negCutoff:]
-	testString = "@RedMartcom Redmart you rock!!!"
-	tweetWords = re.findall(r"[\w']+|[.,!?;]", i.rstrip())
-	tweetWords = [feature_select(tweetWords),'']
-	tweetsWordFeatures = []
-	tweetsWordFeatures.append(tweetWords)
 
 	#selects 3/4 of the features to be used for training and 1/4 to be used for testing
-	posCutoff = int(math.floor(len(posFeatures)*3/4))
-	negCutoff = int(math.floor(len(negFeatures)*3/4))
+	posCutoff = int(math.floor(len(posFeatures)))
+	negCutoff = int(math.floor(len(negFeatures)))
 	trainFeatures = posFeatures[:posCutoff] + negFeatures[:negCutoff]
-	testFeatures = tweetsWordFeatures
 
 	#trains a Naive Bayes Classifier
+	global classifier
 	classifier = NaiveBayesClassifier.train(trainFeatures)	
 
-	#initiates referenceSets and test
-	referenceSets = collections.defaultdict(set)
-	testSets = collections.defaultdict(set)	
-
-	#puts correctly labeled sentences in referenceSets and the predictively labeled version in testsets
-	for i, (features, label) in enumerate(testFeatures):
-		referenceSets[label].add(i)
-		predicted = classifier.classify(features)
-		print predicted
-		testSets[predicted].add(i)	
-#creates a feature selection mechanism that uses all words
+#creates a feature selection mechanism that uses all word
 def make_full_dict(words):
 	return dict([(word, True) for word in words])
 
@@ -87,6 +91,22 @@ def create_word_scores():
 			for i in negSentences:
 				negWord = re.findall(r"[\w']+|[.,!?;]", i.rstrip())
 				negWords.append(negWord)
+
+	with open(RT_POLARITY_NEG_FILE, 'r') as negSentences:
+		for i in negSentences:
+			negWord = re.findall(r"[\w']+|[.,!?;]", i.rstrip())
+			negWords.append(negWord)
+
+	with open(RT_POLARITY_POS_FILE, 'r') as posSentences:
+		for i in posSentences:
+			posWord = re.findall(r"[\w']+|[.,!?;]", i.rstrip())
+			posWords.append(posWord)
+
+	with open(USER_DEFINED_NEG_FILE, 'r') as negSentences:
+		for i in negSentences:
+			negWord = re.findall(r"[\w']+|[.,!?;]", i.rstrip())
+			negWords.append(negWord)
+
 	posWords = list(itertools.chain(*posWords))
 	negWords = list(itertools.chain(*negWords))
 
@@ -135,4 +155,15 @@ for num in numbers_to_test:
 	best_words = find_best_words(word_scores, num)
 	evaluate_features(best_word_features)
 
+
+def get_sentiment(tweet):
+	tweetWords = re.findall(r"[\w']+|[.,!?;]", tweet.rstrip())
+	tweetWords = [feature_select(tweetWords),'']
+	tweetsWordFeatures = []
+	tweetsWordFeatures.append(tweetWords)
+	testFeatures = tweetsWordFeatures
+
+	for i, (features, label) in enumerate(testFeatures):
+		predicted = classifier.classify(features)
+		return predicted
 
